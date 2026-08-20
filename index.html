@@ -94,7 +94,6 @@
                 <span id="lbl-speed" class="w-10 font-mono text-right text-gray-300">1.0x</span>
             </div>
 
-            <!-- Zoom Slider -->
             <div class="flex items-center gap-2 bg-gray-800 px-3 py-1.5 rounded border border-gray-600">
                 <label class="text-gray-300">Zoom:</label>
                 <input type="range" id="slider-zoom" min="0" max="100" value="100" class="w-20 single-slider">
@@ -141,7 +140,6 @@
         <div class="bg-gray-800 p-6 rounded-lg w-96 border border-gray-600 shadow-2xl flex flex-col max-h-[80vh]">
             <h2 class="text-xl font-bold mb-2 text-blue-400 border-b border-gray-600 pb-2">Select Tracks</h2>
             <p class="text-sm text-gray-400 mb-4">Choose which tracks to load into the visualizer.</p>
-            
             <div id="track-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-2 mb-6 pr-2"></div>
             <button id="btn-confirm-tracks" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded font-bold transition text-white text-lg">Load Selected Tracks</button>
         </div>
@@ -151,7 +149,18 @@
     <div id="modal-settings" class="hidden absolute inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
         <div class="bg-gray-800 p-6 rounded-lg w-72 border border-gray-600 shadow-2xl text-sm">
             <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-gray-600 pb-2">Configuration</h2>
+            
             <div id="color-pickers-container" class="flex flex-col gap-3 mb-4"></div>
+            
+            <!-- Text Color Picker -->
+            <div class="mb-4 border-t border-gray-600 pt-4">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-gray-300">Text Color</span>
+                    <input type="color" id="color-text" value="#FFFFFF" class="w-20 h-8 cursor-pointer rounded border-0 bg-transparent">
+                </div>
+            </div>
+
+            <!-- Note Size Slider -->
             <div class="mb-6 border-t border-gray-600 pt-4">
                 <div class="flex items-center justify-between mb-2">
                     <span class="font-bold text-gray-300">Note Size</span>
@@ -159,6 +168,7 @@
                 </div>
                 <input type="range" id="slider-note-size" min="0.5" max="2.0" step="0.1" value="1.0" class="single-slider w-full">
             </div>
+
             <button id="btn-close-settings" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold transition text-white">Done</button>
         </div>
     </div>
@@ -169,12 +179,16 @@
             'C': '#EF4444', 'D': '#F97316', 'E': '#EAB308',
             'F': '#22C55E', 'G': '#3B82F6', 'A': '#6366F1', 'B': '#A855F7'
         };
+        let TEXT_COLOR = '#FFFFFF';
         let noteScale = 1.0;
 
         function loadConfig() {
             try {
                 const savedColors = localStorage.getItem('midi_piano_colors');
                 if (savedColors) NOTE_COLORS = { ...NOTE_COLORS, ...JSON.parse(savedColors) };
+                
+                const savedTextColor = localStorage.getItem('midi_piano_text_color');
+                if (savedTextColor) TEXT_COLOR = savedTextColor;
                 
                 const savedScale = localStorage.getItem('midi_piano_scale');
                 if (savedScale) noteScale = parseFloat(savedScale);
@@ -183,12 +197,22 @@
                 if (savedZoom) document.getElementById('slider-zoom').value = savedZoom;
             } catch(e) {}
         }
+        
         function saveConfig() {
             try {
                 localStorage.setItem('midi_piano_colors', JSON.stringify(NOTE_COLORS));
+                localStorage.setItem('midi_piano_text_color', TEXT_COLOR);
                 localStorage.setItem('midi_piano_scale', noteScale.toString());
                 localStorage.setItem('midi_piano_zoom', document.getElementById('slider-zoom').value);
             } catch(e) {}
+        }
+
+        // --- Realistic Piano Coordinate Math ---
+        function getNotePos(midi) {
+            const octave = Math.floor(midi / 12);
+            const note = midi % 12;
+            const offsets = [0, 0.5, 1, 1.5, 2, 3, 3.5, 4, 4.5, 5, 5.5, 6];
+            return (octave * 7) + offsets[note];
         }
 
         // --- Global Variables ---
@@ -203,9 +227,9 @@
         let loopPauseUntil = 0; 
         let flashAlpha = 0; 
 
-        // Unified Dynamic Zoom State Memory
-        let visualMin = 21; 
-        let visualMax = 108;
+        // Visual Zoom Memory (using white-key coordinates)
+        let visualMin = 12; // A0
+        let visualMax = 63; // C8
 
         let allNotesSorted = []; 
         let measureDuration = 2;
@@ -222,6 +246,7 @@
         }
         window.addEventListener('resize', resize);
         
+        // Initialize Config
         loadConfig();
 
         const colorContainer = document.getElementById('color-pickers-container');
@@ -238,6 +263,15 @@
                 saveConfig();
                 if (!isPlaying && totalDuration > 0) drawVisualizer(); 
             });
+        });
+
+        // Setup Text Color Picker
+        const colorTextPicker = document.getElementById('color-text');
+        colorTextPicker.value = TEXT_COLOR;
+        colorTextPicker.addEventListener('input', (e) => {
+            TEXT_COLOR = e.target.value;
+            saveConfig();
+            if (!isPlaying && totalDuration > 0) drawVisualizer();
         });
 
         const sliderNoteSize = document.getElementById('slider-note-size');
@@ -637,12 +671,12 @@
 
             const uiHeight = uiBar.style.display === 'flex' ? uiBar.offsetHeight : 0;
             const drawHeight = canvas.height - uiHeight;
-            const playheadY = drawHeight * 0.85; 
+            const playheadY = drawHeight * 0.70; 
             const pixelsPerSecond = 350; 
             
-            // --- ZOOM LOGIC ---
-            let targetMin = 21; 
-            let targetMax = 108;
+            // --- ZOOM LOGIC (Using realistic white key coordinates) ---
+            let targetMin = 11.5; 
+            let targetMax = 63.5; 
             let zoomMode = parseInt(sliderZoom.value);
             
             const lookaheadTime = (playheadY / pixelsPerSecond) + 3.0; 
@@ -654,18 +688,18 @@
             }
 
             if (zoomMode === 100) {
-                // AUTO DYNAMIC ZOOM
                 if (visibleNotes.length > 0) {
-                    let tMin = 127, tMax = 0;
+                    let tMin = 999, tMax = -999;
                     visibleNotes.forEach(n => {
-                        tMin = Math.min(tMin, n.midi);
-                        tMax = Math.max(tMax, n.midi);
+                        const pos = getNotePos(n.midi);
+                        tMin = Math.min(tMin, pos);
+                        tMax = Math.max(tMax, pos);
                     });
                     
-                    tMin -= 3; 
-                    tMax += 3;
+                    tMin -= 2; 
+                    tMax += 2;
                     
-                    const minDynamicRange = 24; 
+                    const minDynamicRange = 14; 
                     if (tMax - tMin < minDynamicRange) {
                         const center = (tMin + tMax) / 2;
                         tMin = center - (minDynamicRange / 2);
@@ -674,42 +708,37 @@
                     targetMin = tMin;
                     targetMax = tMax;
                 } else {
-                    targetMin = 40; 
-                    targetMax = 80;
+                    targetMin = 24; 
+                    targetMax = 52;
                 }
             } else if (zoomMode === 0) {
-                // FULL 88 KEYS OUT
-                targetMin = 21;
-                targetMax = 108;
+                targetMin = 11.5;
+                targetMax = 63.5;
             } else {
-                // MANUAL ZOOM WIDTH 
-                let activeCenter = 64;
+                let activeCenter = 37.5;
                 if (visibleNotes.length > 0) {
                     let sum = 0;
-                    visibleNotes.forEach(n => sum += n.midi);
+                    visibleNotes.forEach(n => sum += getNotePos(n.midi));
                     activeCenter = sum / visibleNotes.length;
                 } else {
                     activeCenter = (visualMin + visualMax) / 2;
                 }
 
                 const zoomFactor = zoomMode / 100; 
-                const keysWidth = 88 - (zoomFactor * (88 - 14)); 
+                const keysWidth = 52 - (zoomFactor * (52 - 14)); 
                 
                 targetMin = activeCenter - (keysWidth / 2);
                 targetMax = activeCenter + (keysWidth / 2);
                 
-                if (targetMin < 21) { targetMin = 21; targetMax = Math.min(108, targetMin + keysWidth); }
-                if (targetMax > 108) { targetMax = 108; targetMin = Math.max(21, targetMax - keysWidth); }
+                if (targetMin < 11.5) { targetMin = 11.5; targetMax = Math.min(63.5, targetMin + keysWidth); }
+                if (targetMax > 63.5) { targetMax = 63.5; targetMin = Math.max(11.5, targetMax - keysWidth); }
             }
 
-            // --- ASYMMETRIC LERP & SPEED LIMIT (Smoother Camera) ---
             let lerpMin, lerpMax;
             if (zoomMode === 100) {
-                // Expand slowly (0.015) to meet notes as they fall, shrink extremely slowly (0.002)
                 lerpMin = (targetMin < visualMin) ? 0.015 : 0.002; 
                 lerpMax = (targetMax > visualMax) ? 0.015 : 0.002;
             } else {
-                // Manual tracking lerp
                 lerpMin = 0.02;
                 lerpMax = 0.02;
             }
@@ -717,9 +746,7 @@
             let stepMin = (targetMin - visualMin) * lerpMin;
             let stepMax = (targetMax - visualMax) * lerpMax;
 
-            // Enforce a strict "speed limit" on the camera (max 0.3 keys per frame)
-            // This guarantees the camera physically cannot jump instantly, forcing a smooth pan
-            const maxSpeed = 0.3;
+            const maxSpeed = 0.3; 
             if (stepMin > maxSpeed) stepMin = maxSpeed;
             if (stepMin < -maxSpeed) stepMin = -maxSpeed;
             if (stepMax > maxSpeed) stepMax = maxSpeed;
@@ -728,40 +755,23 @@
             visualMin += stepMin;
             visualMax += stepMax;
 
-            // --- DRAWING ---
+            // --- FALLING NOTES DRAWING ---
             const range = visualMax - visualMin || 1;
             const xPadding = 20;
             const xSpace = canvas.width - (xPadding * 2);
 
-            const normalizedC4 = (60 - visualMin) / range;
-            const xC4 = xPadding + (normalizedC4 * xSpace);
-
-            if (xC4 > 0 && xC4 < canvas.width) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(xC4, 0);
-                ctx.lineTo(xC4, drawHeight);
-                ctx.stroke();
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                ctx.font = 'bold 16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText("Middle C", xC4, 40);
-            }
-
-            ctx.strokeStyle = '#F3F4F6';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(0, playheadY);
-            ctx.lineTo(canvas.width, playheadY);
-            ctx.stroke();
-
             const mainFontSize = Math.max(10, Math.floor(26 * noteScale));
             const subFontSize = Math.max(8, Math.floor(12 * noteScale));
             const staggerAmount = Math.floor(13 * noteScale);
-            const baseBlockWidth = xSpace / range;
-            const blockWidth = Math.max(2, baseBlockWidth * noteScale);
+            
+            const baseWhiteWidth = xSpace / range;
+
+            const activeMidis = new Set();
+            allNotesSorted.forEach(n => {
+                if (n.time <= currentTime && (n.time + n.duration) > currentTime) {
+                    activeMidis.add(n.midi);
+                }
+            });
 
             allNotesSorted.forEach(note => {
                 const yBottom = playheadY - (note.time - currentTime) * pixelsPerSecond;
@@ -770,25 +780,35 @@
 
                 if (yBottom < 0 || yTop > drawHeight) return; 
 
-                const normalized = (note.midi - visualMin) / range;
-                const x = xPadding + (normalized * xSpace) - (blockWidth / 2);
+                const pos = getNotePos(note.midi);
+                const normalized = (pos - visualMin) / range;
+                const xCenter = xPadding + (normalized * xSpace);
+                
+                const isBlackNote = note.name.includes('#') || note.name.includes('b');
+                const noteWidth = (isBlackNote ? baseWhiteWidth * 0.65 : baseWhiteWidth) * noteScale;
+                const x = xCenter - (noteWidth / 2);
 
-                if (x + blockWidth < 0 || x > canvas.width) return;
+                if (x + noteWidth < 0 || x > canvas.width) return;
 
                 const baseLetter = note.name.charAt(0).toUpperCase();
                 const blockColor = NOTE_COLORS[baseLetter] || '#888888';
 
                 ctx.fillStyle = blockColor;
                 ctx.beginPath();
-                ctx.roundRect(x, yTop, blockWidth, h, 6);
+                ctx.roundRect(x, yTop, noteWidth, h, 6);
                 ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
 
                 const match = note.name.match(/^([A-G][#b]?)([-0-9]+)$/);
                 const pitchText = match ? match[1] : note.name;
                 const octaveText = match ? match[2] : "";
 
                 if (h > 35 || Math.abs(note.time - currentTime) < 0.1) {
-                    ctx.fillStyle = '#FFFFFF';
+                    // Apply user-configured text color
+                    ctx.fillStyle = TEXT_COLOR;
                     ctx.textBaseline = 'middle';
                     ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
                     ctx.shadowBlur = 4;
@@ -807,7 +827,7 @@
                     const w2 = ctx.measureText(octaveText).width;
                     
                     const totalW = w1 + w2;
-                    const startX = x + (blockWidth - totalW) / 2;
+                    const startX = x + (noteWidth - totalW) / 2;
 
                     ctx.textAlign = 'left';
                     ctx.font = `bold ${mainFontSize}px sans-serif`;
@@ -819,6 +839,94 @@
                     ctx.shadowBlur = 0; 
                 }
             });
+
+            // --- STATIC PIANO KEYBOARD DRAWING (OVERLAY) ---
+            const kbTop = playheadY;
+            const kbHeight = drawHeight - playheadY;
+
+            ctx.fillStyle = '#111827';
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 10; 
+            ctx.fillRect(0, kbTop, canvas.width, kbHeight);
+            ctx.shadowBlur = 0; 
+
+            ctx.beginPath();
+            ctx.moveTo(0, kbTop);
+            ctx.lineTo(canvas.width, kbTop);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#374151';
+            ctx.stroke();
+
+            const whiteKeys = [];
+            const blackKeys = [];
+            
+            for (let i = 21; i <= 108; i++) {
+                const pos = getNotePos(i);
+                
+                if (pos < visualMin - 1 || pos > visualMax + 1) continue; 
+
+                const isBlack = [1,3,6,8,10].includes(i % 12);
+                const isActive = activeMidis.has(i);
+                
+                const colorMap = ['C','C','D','D','E','F','F','G','G','A','A','B'];
+                const colorKey = colorMap[i % 12];
+                const activeColor = NOTE_COLORS[colorKey] || '#3B82F6';
+
+                // Set default idle colors. Make Middle C (MIDI 60) a distinct light grey.
+                let idleColor = isBlack ? '#1F2937' : '#E5E7EB';
+                if (i === 60) idleColor = '#9CA3AF'; 
+
+                if (isBlack) {
+                    blackKeys.push({ pos, isActive, activeColor, idleColor });
+                } else {
+                    whiteKeys.push({ pos, isActive, activeColor, idleColor });
+                }
+            }
+
+            whiteKeys.forEach(k => {
+                const normalized = (k.pos - visualMin) / range;
+                const xCenter = xPadding + (normalized * xSpace);
+                const w = baseWhiteWidth;
+                const x = xCenter - (w / 2);
+
+                ctx.fillStyle = k.isActive ? k.activeColor : k.idleColor; 
+                ctx.strokeStyle = '#1F2937'; 
+                ctx.lineWidth = 1;
+                
+                ctx.beginPath();
+                ctx.roundRect(x, kbTop, w, kbHeight, [0, 0, 4, 4]);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            blackKeys.forEach(k => {
+                const normalized = (k.pos - visualMin) / range;
+                const xCenter = xPadding + (normalized * xSpace);
+                const w = baseWhiteWidth * 0.65; 
+                const h = kbHeight * 0.65; 
+                const x = xCenter - (w / 2);
+
+                ctx.fillStyle = k.isActive ? k.activeColor : k.idleColor; 
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 1;
+
+                ctx.beginPath();
+                ctx.roundRect(x, kbTop, w, h, [0, 0, 4, 4]);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            const normalizedC4 = (getNotePos(60) - visualMin) / range;
+            const xC4 = xPadding + (normalizedC4 * xSpace);
+
+            if (xC4 > 0 && xC4 < canvas.width) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(xC4, 0);
+                ctx.lineTo(xC4, playheadY);
+                ctx.stroke();
+            }
 
             if (flashAlpha > 0) {
                 ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
