@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Piano Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111827; color: white; font-family: sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        #ui-bar {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: rgba(31, 41, 55, 0.95);
+            padding: 15px 20px; border-top: 1px solid #374151;
+            display: none; flex-direction: column; gap: 16px;
+            z-index: 10;
+        }
+        
+        #upload-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111827; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 50;
+        }
+        
+        input[type=range].single-slider { 
+            accent-color: #3B82F6; 
+            width: 100%; margin: 0; padding: 0; cursor: pointer;
+        }
+
+        .slider-wrapper { flex-grow: 1; margin: 0 16px; position: relative; height: 24px; display: flex; align-items: center;}
+        .dual-slider-container { position: relative; width: 100%; height: 100%; }
+        
+        .dual-slider-track {
+            position: absolute; top: 50%; left: 8px; right: 8px;
+            height: 4px; background: #4b5563;
+            transform: translateY(-50%); border-radius: 2px;
+        }
+        
+        .dual-slider-range {
+            position: absolute; top: 50%;
+            height: 4px; background: #3B82F6;
+            transform: translateY(-50%); border-radius: 2px;
+            pointer-events: none;
+        }
+        
+        .dual-slider-input {
+            position: absolute; top: 50%; left: 0; width: 100%;
+            transform: translateY(-50%); appearance: none;
+            background: transparent; pointer-events: none; margin: 0; padding: 0;
+        }
+        
+        .dual-slider-input::-webkit-slider-thumb, .dual-slider-input::-moz-range-thumb {
+            appearance: none; pointer-events: auto;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: #3B82F6; cursor: pointer; border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+        
+        .custom-scroll::-webkit-scrollbar { width: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #4B5563; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div id="upload-screen">
+        <h1 class="text-4xl font-bold mb-4 text-blue-400">Piano MIDI Reader</h1>
+        <p class="text-gray-400 mb-6">Select a .mid or .midi file to begin</p>
+        <label class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded cursor-pointer transition">
+            Load MIDI File
+            <input type="file" id="file-input-initial" accept=".mid,.midi" class="hidden">
+        </label>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="ui-bar" class="text-sm">
+        <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 relative">
+            <label class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded cursor-pointer font-bold transition flex items-center">
+                Load New File
+                <input type="file" id="file-input-main" accept=".mid,.midi" class="hidden">
+            </label>
+
+            <div class="flex items-center gap-1 bg-gray-800 rounded p-1">
+                <button id="btn-play" class="bg-blue-600 hover:bg-blue-500 w-20 py-1.5 rounded font-bold transition">Play</button>
+                <button id="btn-step" class="bg-purple-600 hover:bg-purple-500 w-20 py-1.5 rounded font-bold transition">Step</button>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <label class="text-gray-300">Speed:</label>
+                <input type="range" id="slider-speed" min="0.1" max="2" step="0.1" value="1" class="w-20 single-slider">
+                <span id="lbl-speed" class="w-10 font-mono text-right text-gray-300">1.0x</span>
+            </div>
+
+            <!-- Zoom Slider -->
+            <div class="flex items-center gap-2 bg-gray-800 px-3 py-1.5 rounded border border-gray-600">
+                <label class="text-gray-300">Zoom:</label>
+                <input type="range" id="slider-zoom" min="0" max="100" value="100" class="w-20 single-slider">
+                <span id="lbl-zoom" class="w-10 font-mono text-right text-blue-400 font-bold">Auto</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label class="text-gray-300">Vol:</label>
+                <input type="range" id="slider-volume" min="0" max="1" step="0.05" value="0.5" class="w-16 single-slider">
+            </div>
+
+            <button id="btn-settings" class="ml-2 text-gray-400 hover:text-white transition p-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex items-center max-w-5xl mx-auto w-full">
+            <span class="text-gray-400 w-16 text-right">Loop:</span>
+            <div class="slider-wrapper">
+                <div class="dual-slider-container">
+                    <div class="dual-slider-track"></div>
+                    <div id="loop-range-highlight" class="dual-slider-range" style="left: 8px; width: calc(100% - 16px);"></div>
+                    <input type="range" id="slider-start" class="dual-slider-input" min="1" max="1" value="1" style="z-index: 3;" />
+                    <input type="range" id="slider-end" class="dual-slider-input" min="1" max="1" value="1" style="z-index: 4;" />
+                </div>
+            </div>
+            <span id="lbl-loop-range" class="font-mono text-blue-400 w-16 text-right">1-1</span>
+        </div>
+
+        <div class="flex items-center max-w-5xl mx-auto w-full">
+            <span class="text-gray-400 w-16 text-right">Time:</span>
+            <div class="slider-wrapper">
+                <input type="range" id="slider-progress" min="0" max="100" value="0" step="0.1" class="single-slider h-full">
+            </div>
+            <span id="lbl-time" class="font-mono text-blue-400 w-16 text-right">0:00</span>
+        </div>
+    </div>
+
+    <!-- Track Selection Modal -->
+    <div id="modal-tracks" class="hidden absolute inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center">
+        <div class="bg-gray-800 p-6 rounded-lg w-96 border border-gray-600 shadow-2xl flex flex-col max-h-[80vh]">
+            <h2 class="text-xl font-bold mb-2 text-blue-400 border-b border-gray-600 pb-2">Select Tracks</h2>
+            <p class="text-sm text-gray-400 mb-4">Choose which tracks to load into the visualizer.</p>
+            
+            <div id="track-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-2 mb-6 pr-2"></div>
+            <button id="btn-confirm-tracks" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded font-bold transition text-white text-lg">Load Selected Tracks</button>
+        </div>
+    </div>
+
+    <!-- Config Modal -->
+    <div id="modal-settings" class="hidden absolute inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
+        <div class="bg-gray-800 p-6 rounded-lg w-72 border border-gray-600 shadow-2xl text-sm">
+            <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-gray-600 pb-2">Configuration</h2>
+            <div id="color-pickers-container" class="flex flex-col gap-3 mb-4"></div>
+            <div class="mb-6 border-t border-gray-600 pt-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-bold text-gray-300">Note Size</span>
+                    <span id="lbl-note-size" class="text-blue-400 font-mono">1.0x</span>
+                </div>
+                <input type="range" id="slider-note-size" min="0.5" max="2.0" step="0.1" value="1.0" class="single-slider w-full">
+            </div>
+            <button id="btn-close-settings" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold transition text-white">Done</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Persistence / Configuration State ---
+        let NOTE_COLORS = {
+            'C': '#EF4444', 'D': '#F97316', 'E': '#EAB308',
+            'F': '#22C55E', 'G': '#3B82F6', 'A': '#6366F1', 'B': '#A855F7'
+        };
+        let noteScale = 1.0;
+
+        function loadConfig() {
+            try {
+                const savedColors = localStorage.getItem('midi_piano_colors');
+                if (savedColors) NOTE_COLORS = { ...NOTE_COLORS, ...JSON.parse(savedColors) };
+                
+                const savedScale = localStorage.getItem('midi_piano_scale');
+                if (savedScale) noteScale = parseFloat(savedScale);
+
+                const savedZoom = localStorage.getItem('midi_piano_zoom');
+                if (savedZoom) document.getElementById('slider-zoom').value = savedZoom;
+            } catch(e) {}
+        }
+        function saveConfig() {
+            try {
+                localStorage.setItem('midi_piano_colors', JSON.stringify(NOTE_COLORS));
+                localStorage.setItem('midi_piano_scale', noteScale.toString());
+                localStorage.setItem('midi_piano_zoom', document.getElementById('slider-zoom').value);
+            } catch(e) {}
+        }
+
+        // --- Global Variables ---
+        let audioCtx = null;
+        let masterGain = null;
+        let isPlaying = false;
+        let currentTime = 0; 
+        let totalDuration = 0;
+        let lastFrameTime = 0;
+        let playbackSpeed = 1.0;
+        let animationId = null;
+        let loopPauseUntil = 0; 
+        let flashAlpha = 0; 
+
+        // Unified Dynamic Zoom State Memory
+        let visualMin = 21; 
+        let visualMax = 108;
+
+        let allNotesSorted = []; 
+        let measureDuration = 2;
+        let totalMeasures = 1;
+        let activeOscillators = new Map();
+        let pendingMidiData = null; 
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if (!isPlaying && totalDuration > 0) drawVisualizer();
+        }
+        window.addEventListener('resize', resize);
+        
+        loadConfig();
+
+        const colorContainer = document.getElementById('color-pickers-container');
+        ['C', 'D', 'E', 'F', 'G', 'A', 'B'].forEach(note => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between';
+            row.innerHTML = `
+                <span class="font-bold text-lg w-8">${note}</span>
+                <input type="color" id="color-${note}" value="${NOTE_COLORS[note]}" class="w-20 h-8 cursor-pointer rounded border-0 bg-transparent">
+            `;
+            colorContainer.appendChild(row);
+            document.getElementById(`color-${note}`).addEventListener('input', (e) => {
+                NOTE_COLORS[note] = e.target.value;
+                saveConfig();
+                if (!isPlaying && totalDuration > 0) drawVisualizer(); 
+            });
+        });
+
+        const sliderNoteSize = document.getElementById('slider-note-size');
+        const lblNoteSize = document.getElementById('lbl-note-size');
+        sliderNoteSize.value = noteScale;
+        lblNoteSize.textContent = noteScale.toFixed(1) + 'x';
+
+        sliderNoteSize.addEventListener('input', (e) => {
+            noteScale = parseFloat(e.target.value);
+            lblNoteSize.textContent = noteScale.toFixed(1) + 'x';
+            saveConfig();
+            if (!isPlaying && totalDuration > 0) drawVisualizer();
+        });
+
+        const sliderZoom = document.getElementById('slider-zoom');
+        const lblZoom = document.getElementById('lbl-zoom');
+        
+        function updateZoomLabel() {
+            let val = parseInt(sliderZoom.value);
+            if (val === 100) lblZoom.textContent = 'Auto';
+            else if (val === 0) lblZoom.textContent = 'Out';
+            else lblZoom.textContent = val + '%';
+        }
+        updateZoomLabel();
+
+        sliderZoom.addEventListener('input', () => {
+            updateZoomLabel();
+            saveConfig();
+            if (!isPlaying && totalDuration > 0) drawVisualizer();
+        });
+
+        document.getElementById('btn-settings').addEventListener('click', () => { document.getElementById('modal-settings').classList.remove('hidden'); });
+        document.getElementById('btn-close-settings').addEventListener('click', () => { document.getElementById('modal-settings').classList.add('hidden'); });
+
+        resize();
+
+        // --- DOM Elements ---
+        const uiUpload = document.getElementById('upload-screen');
+        const uiBar = document.getElementById('ui-bar');
+        const btnPlay = document.getElementById('btn-play');
+        const btnStep = document.getElementById('btn-step');
+        const sliderVolume = document.getElementById('slider-volume');
+        const sliderSpeed = document.getElementById('slider-speed');
+        const lblSpeed = document.getElementById('lbl-speed');
+        const sliderStart = document.getElementById('slider-start');
+        const sliderEnd = document.getElementById('slider-end');
+        const loopHighlight = document.getElementById('loop-range-highlight');
+        const lblLoopRange = document.getElementById('lbl-loop-range');
+        const sliderProgress = document.getElementById('slider-progress');
+        const lblTime = document.getElementById('lbl-time');
+
+        // --- Helpers ---
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                masterGain.connect(audioCtx.destination);
+                masterGain.gain.value = sliderVolume.value;
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        // --- 1. File Upload, Track Selection, & Parsing ---
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                stopAllAudio();
+                isPlaying = false;
+                loopPauseUntil = 0;
+                btnPlay.textContent = 'Play';
+                btnPlay.classList.replace('bg-red-600', 'bg-blue-600');
+                btnPlay.classList.replace('hover:bg-red-500', 'hover:bg-blue-500');
+                currentTime = 0;
+                if (animationId) cancelAnimationFrame(animationId);
+
+                pendingMidiData = new Midi(evt.target.result);
+                promptTrackSelection(pendingMidiData);
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = ''; 
+        }
+
+        document.getElementById('file-input-initial').addEventListener('change', handleFileUpload);
+        document.getElementById('file-input-main').addEventListener('change', handleFileUpload);
+
+        function promptTrackSelection(midi) {
+            const trackList = document.getElementById('track-list');
+            trackList.innerHTML = ''; 
+
+            const activeTracks = midi.tracks.map((t, i) => ({ track: t, originalIndex: i }))
+                                            .filter(item => item.track.notes.length > 0);
+
+            if (activeTracks.length === 0) {
+                alert("No playable notes found in this MIDI file.");
+                return;
+            }
+
+            activeTracks.forEach((item, index) => {
+                let tName = item.track.name ? item.track.name.trim() : "";
+                if (!tName && item.track.instrument.name) tName = item.track.instrument.name.trim();
+                if (!tName) tName = `Track ${item.originalIndex + 1}`;
+                
+                const noteCount = item.track.notes.length;
+
+                const lbl = document.createElement('label');
+                lbl.className = "flex items-center gap-3 p-3 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition border border-gray-600";
+                lbl.innerHTML = `
+                    <input type="checkbox" checked data-track-index="${item.originalIndex}" class="w-5 h-5 accent-blue-500 cursor-pointer">
+                    <div class="flex flex-col">
+                        <span class="font-bold text-white">${tName}</span>
+                        <span class="text-xs text-gray-400">${noteCount} notes</span>
+                    </div>
+                `;
+                trackList.appendChild(lbl);
+            });
+
+            document.getElementById('modal-tracks').classList.remove('hidden');
+        }
+
+        document.getElementById('btn-confirm-tracks').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('#track-list input[type="checkbox"]');
+            const selectedIndices = Array.from(checkboxes).filter(cb => cb.checked).map(cb => parseInt(cb.dataset.trackIndex));
+            
+            if (selectedIndices.length === 0) {
+                alert("Please select at least one track to play.");
+                return;
+            }
+
+            document.getElementById('modal-tracks').classList.add('hidden');
+            processSelectedTracks(pendingMidiData, selectedIndices);
+        });
+
+        function processSelectedTracks(midi, selectedIndices) {
+            let bpm = 120;
+            if (midi.header.tempos.length > 0) bpm = midi.header.tempos[0].bpm;
+            let timeSig = [4, 4];
+            if (midi.header.timeSignatures.length > 0) timeSig = midi.header.timeSignatures[0].timeSignature;
+            
+            measureDuration = timeSig[0] * (60 / bpm);
+
+            let allNotes = [];
+            selectedIndices.forEach(idx => {
+                allNotes.push(...midi.tracks[idx].notes);
+            });
+
+            allNotesSorted = [...allNotes].sort((a, b) => a.time - b.time); 
+            
+            if (allNotesSorted.length > 0) {
+                totalDuration = Math.max(...allNotesSorted.map(n => n.time + n.duration));
+            } else {
+                totalDuration = 0;
+            }
+            
+            totalMeasures = Math.max(1, Math.ceil(totalDuration / measureDuration));
+
+            sliderStart.min = 1; sliderStart.max = totalMeasures; sliderStart.value = 1;
+            sliderEnd.min = 1; sliderEnd.max = totalMeasures; sliderEnd.value = totalMeasures;
+            updateLoopHighlight();
+
+            sliderProgress.max = totalDuration;
+            updateSyncUI();
+
+            uiUpload.style.display = 'none';
+            uiBar.style.display = 'flex';
+            resize(); 
+
+            lastFrameTime = performance.now();
+            animationLoop(lastFrameTime);
+        }
+
+        // --- 2. UI Controls ---
+        btnPlay.addEventListener('click', () => {
+            initAudio();
+            isPlaying = !isPlaying;
+            btnPlay.textContent = isPlaying ? 'Pause' : 'Play';
+            btnPlay.classList.toggle('bg-red-600', isPlaying);
+            btnPlay.classList.toggle('hover:bg-red-500', isPlaying);
+            btnPlay.classList.toggle('bg-blue-600', !isPlaying);
+            btnPlay.classList.toggle('hover:bg-blue-500', !isPlaying);
+
+            if (isPlaying) {
+                lastFrameTime = performance.now();
+                loopPauseUntil = 0;
+            } else {
+                stopAllAudio();
+            }
+        });
+
+        btnStep.addEventListener('click', () => {
+            initAudio();
+            if (isPlaying) btnPlay.click(); 
+            stopAllAudio();
+
+            const startVal = parseInt(sliderStart.value);
+            const endVal = parseInt(sliderEnd.value);
+            const loopStartTime = (startVal - 1) * measureDuration;
+            const loopEndTime = endVal * measureDuration;
+
+            let nextTime = -1;
+            for (let i = 0; i < allNotesSorted.length; i++) {
+                if (allNotesSorted[i].time > currentTime + 0.005) {
+                    nextTime = allNotesSorted[i].time;
+                    break;
+                }
+            }
+
+            if (nextTime === -1 || nextTime >= loopEndTime) {
+                nextTime = loopStartTime;
+                for (let i = 0; i < allNotesSorted.length; i++) {
+                    if (allNotesSorted[i].time >= loopStartTime) {
+                        nextTime = allNotesSorted[i].time;
+                        break;
+                    }
+                }
+                flashAlpha = 0.2; 
+            }
+
+            if (nextTime !== -1) {
+                currentTime = nextTime;
+                updateSyncUI();
+                
+                const notesToPlay = allNotesSorted.filter(n => Math.abs(n.time - currentTime) < 0.005);
+                notesToPlay.forEach(n => playNoteAudio(n, Math.min(n.duration, 0.5)));
+                
+                drawVisualizer(); 
+            }
+        });
+
+        sliderVolume.addEventListener('input', (e) => {
+            if (masterGain) masterGain.gain.value = e.target.value;
+        });
+
+        sliderSpeed.addEventListener('input', (e) => {
+            playbackSpeed = parseFloat(e.target.value);
+            lblSpeed.textContent = playbackSpeed.toFixed(1) + 'x';
+        });
+
+        sliderProgress.addEventListener('input', (e) => {
+            currentTime = parseFloat(e.target.value);
+            loopPauseUntil = 0;
+            stopAllAudio();
+            updateSyncUI();
+            if (!isPlaying) drawVisualizer();
+        });
+
+        function updateLoopHighlight() {
+            const min = parseInt(sliderStart.min);
+            const max = parseInt(sliderStart.max);
+            const start = parseInt(sliderStart.value);
+            const end = parseInt(sliderEnd.value);
+            
+            const range = max - min || 1; 
+            const startPercent = ((start - min) / range);
+            const endPercent = ((end - min) / range);
+            
+            loopHighlight.style.left = `calc(8px + (100% - 16px) * ${startPercent})`;
+            loopHighlight.style.width = `calc((100% - 16px) * ${endPercent - startPercent})`;
+            lblLoopRange.textContent = `${start}-${end}`;
+        }
+
+        sliderStart.addEventListener('input', (e) => {
+            let startVal = parseInt(e.target.value);
+            let endVal = parseInt(sliderEnd.value);
+            if (startVal > endVal) { sliderStart.value = endVal; startVal = endVal; }
+            updateLoopHighlight();
+            const startTimeSec = (startVal - 1) * measureDuration;
+            if (currentTime < startTimeSec) {
+                currentTime = startTimeSec;
+                updateSyncUI();
+                if(!isPlaying) drawVisualizer();
+            }
+        });
+
+        sliderEnd.addEventListener('input', (e) => {
+            let endVal = parseInt(e.target.value);
+            let startVal = parseInt(sliderStart.value);
+            if (endVal < startVal) { sliderEnd.value = startVal; endVal = startVal; }
+            updateLoopHighlight();
+        });
+
+        function updateSyncUI() {
+            sliderProgress.value = currentTime;
+            lblTime.textContent = formatTime(currentTime);
+        }
+
+        // --- 3. Audio Engine ---
+        function playNoteAudio(note, autoStopDuration = null) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = note.midi < 60 ? 'triangle' : 'sine';
+            osc.frequency.value = 440 * Math.pow(2, (note.midi - 69) / 12);
+            
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            const maxVol = Math.max(0.1, note.velocity * 0.3);
+            gain.gain.linearRampToValueAtTime(maxVol, audioCtx.currentTime + 0.02);
+            
+            if (autoStopDuration !== null) {
+                gain.gain.setValueAtTime(maxVol, audioCtx.currentTime + autoStopDuration - 0.05);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + autoStopDuration);
+                setTimeout(() => { osc.stop(); osc.disconnect(); }, autoStopDuration * 1000 + 100);
+            }
+            
+            osc.connect(gain);
+            gain.connect(masterGain); 
+            osc.start();
+            
+            if (autoStopDuration === null) {
+                activeOscillators.set(note, { osc, gain });
+            }
+        }
+
+        function stopNoteAudio(note, data) {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            data.gain.gain.setValueAtTime(data.gain.gain.value, now);
+            data.gain.gain.linearRampToValueAtTime(0, now + 0.05); 
+            setTimeout(() => { data.osc.stop(); data.osc.disconnect(); }, 60);
+        }
+
+        function stopAllAudio() {
+            for (let [note, data] of activeOscillators.entries()) stopNoteAudio(note, data);
+            activeOscillators.clear();
+        }
+
+        function manageRealtimeAudio() {
+            const activeNow = new Set();
+            for (let note of allNotesSorted) {
+                if (note.time <= currentTime && (note.time + note.duration) > currentTime) {
+                    activeNow.add(note);
+                }
+            }
+            for (let note of activeNow) {
+                if (!activeOscillators.has(note)) playNoteAudio(note);
+            }
+            for (let [note, data] of activeOscillators.entries()) {
+                if (!activeNow.has(note)) {
+                    stopNoteAudio(note, data);
+                    activeOscillators.delete(note);
+                }
+            }
+        }
+
+        // --- 4. Render & Dynamic Zoom Processing ---
+        function animationLoop(timestamp) {
+            if (isPlaying) {
+                if (loopPauseUntil > 0) {
+                    if (timestamp < loopPauseUntil) {
+                        lastFrameTime = timestamp;
+                        drawVisualizer();
+                        animationId = requestAnimationFrame(animationLoop);
+                        return; 
+                    } else {
+                        loopPauseUntil = 0; 
+                    }
+                }
+
+                const deltaSeconds = (timestamp - lastFrameTime) / 1000;
+                currentTime += deltaSeconds * playbackSpeed;
+                
+                const startVal = parseInt(sliderStart.value);
+                const endVal = parseInt(sliderEnd.value);
+                const loopStartTime = (startVal - 1) * measureDuration;
+                const loopEndTime = endVal * measureDuration;
+                
+                if (currentTime >= loopEndTime) {
+                    currentTime = loopStartTime;
+                    stopAllAudio();
+                    loopPauseUntil = timestamp + 1000; 
+                    flashAlpha = 0.2; 
+                }
+
+                if (loopPauseUntil === 0) {
+                    updateSyncUI();
+                    manageRealtimeAudio();
+                }
+            }
+            lastFrameTime = timestamp;
+
+            drawVisualizer();
+            animationId = requestAnimationFrame(animationLoop);
+        }
+
+        function drawVisualizer() {
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const uiHeight = uiBar.style.display === 'flex' ? uiBar.offsetHeight : 0;
+            const drawHeight = canvas.height - uiHeight;
+            const playheadY = drawHeight * 0.85; 
+            const pixelsPerSecond = 350; 
+            
+            // --- ZOOM LOGIC ---
+            let targetMin = 21; 
+            let targetMax = 108;
+            let zoomMode = parseInt(sliderZoom.value);
+            
+            const lookaheadTime = (playheadY / pixelsPerSecond) + 3.0; 
+            let visibleNotes = [];
+            for (let n of allNotesSorted) {
+                if (n.time + n.duration > currentTime - 0.5 && n.time < currentTime + lookaheadTime) {
+                    visibleNotes.push(n);
+                }
+            }
+
+            if (zoomMode === 100) {
+                // AUTO DYNAMIC ZOOM
+                if (visibleNotes.length > 0) {
+                    let tMin = 127, tMax = 0;
+                    visibleNotes.forEach(n => {
+                        tMin = Math.min(tMin, n.midi);
+                        tMax = Math.max(tMax, n.midi);
+                    });
+                    
+                    tMin -= 3; 
+                    tMax += 3;
+                    
+                    const minDynamicRange = 24; 
+                    if (tMax - tMin < minDynamicRange) {
+                        const center = (tMin + tMax) / 2;
+                        tMin = center - (minDynamicRange / 2);
+                        tMax = center + (minDynamicRange / 2);
+                    }
+                    targetMin = tMin;
+                    targetMax = tMax;
+                } else {
+                    targetMin = 40; 
+                    targetMax = 80;
+                }
+            } else if (zoomMode === 0) {
+                // FULL 88 KEYS OUT
+                targetMin = 21;
+                targetMax = 108;
+            } else {
+                // MANUAL ZOOM WIDTH 
+                let activeCenter = 64;
+                if (visibleNotes.length > 0) {
+                    let sum = 0;
+                    visibleNotes.forEach(n => sum += n.midi);
+                    activeCenter = sum / visibleNotes.length;
+                } else {
+                    activeCenter = (visualMin + visualMax) / 2;
+                }
+
+                const zoomFactor = zoomMode / 100; 
+                const keysWidth = 88 - (zoomFactor * (88 - 14)); 
+                
+                targetMin = activeCenter - (keysWidth / 2);
+                targetMax = activeCenter + (keysWidth / 2);
+                
+                if (targetMin < 21) { targetMin = 21; targetMax = Math.min(108, targetMin + keysWidth); }
+                if (targetMax > 108) { targetMax = 108; targetMin = Math.max(21, targetMax - keysWidth); }
+            }
+
+            // --- ASYMMETRIC LERP & SPEED LIMIT (Smoother Camera) ---
+            let lerpMin, lerpMax;
+            if (zoomMode === 100) {
+                // Expand slowly (0.015) to meet notes as they fall, shrink extremely slowly (0.002)
+                lerpMin = (targetMin < visualMin) ? 0.015 : 0.002; 
+                lerpMax = (targetMax > visualMax) ? 0.015 : 0.002;
+            } else {
+                // Manual tracking lerp
+                lerpMin = 0.02;
+                lerpMax = 0.02;
+            }
+
+            let stepMin = (targetMin - visualMin) * lerpMin;
+            let stepMax = (targetMax - visualMax) * lerpMax;
+
+            // Enforce a strict "speed limit" on the camera (max 0.3 keys per frame)
+            // This guarantees the camera physically cannot jump instantly, forcing a smooth pan
+            const maxSpeed = 0.3;
+            if (stepMin > maxSpeed) stepMin = maxSpeed;
+            if (stepMin < -maxSpeed) stepMin = -maxSpeed;
+            if (stepMax > maxSpeed) stepMax = maxSpeed;
+            if (stepMax < -maxSpeed) stepMax = -maxSpeed;
+
+            visualMin += stepMin;
+            visualMax += stepMax;
+
+            // --- DRAWING ---
+            const range = visualMax - visualMin || 1;
+            const xPadding = 20;
+            const xSpace = canvas.width - (xPadding * 2);
+
+            const normalizedC4 = (60 - visualMin) / range;
+            const xC4 = xPadding + (normalizedC4 * xSpace);
+
+            if (xC4 > 0 && xC4 < canvas.width) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(xC4, 0);
+                ctx.lineTo(xC4, drawHeight);
+                ctx.stroke();
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText("Middle C", xC4, 40);
+            }
+
+            ctx.strokeStyle = '#F3F4F6';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, playheadY);
+            ctx.lineTo(canvas.width, playheadY);
+            ctx.stroke();
+
+            const mainFontSize = Math.max(10, Math.floor(26 * noteScale));
+            const subFontSize = Math.max(8, Math.floor(12 * noteScale));
+            const staggerAmount = Math.floor(13 * noteScale);
+            const baseBlockWidth = xSpace / range;
+            const blockWidth = Math.max(2, baseBlockWidth * noteScale);
+
+            allNotesSorted.forEach(note => {
+                const yBottom = playheadY - (note.time - currentTime) * pixelsPerSecond;
+                const h = note.duration * pixelsPerSecond;
+                const yTop = yBottom - h;
+
+                if (yBottom < 0 || yTop > drawHeight) return; 
+
+                const normalized = (note.midi - visualMin) / range;
+                const x = xPadding + (normalized * xSpace) - (blockWidth / 2);
+
+                if (x + blockWidth < 0 || x > canvas.width) return;
+
+                const baseLetter = note.name.charAt(0).toUpperCase();
+                const blockColor = NOTE_COLORS[baseLetter] || '#888888';
+
+                ctx.fillStyle = blockColor;
+                ctx.beginPath();
+                ctx.roundRect(x, yTop, blockWidth, h, 6);
+                ctx.fill();
+
+                const match = note.name.match(/^([A-G][#b]?)([-0-9]+)$/);
+                const pitchText = match ? match[1] : note.name;
+                const octaveText = match ? match[2] : "";
+
+                if (h > 35 || Math.abs(note.time - currentTime) < 0.1) {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                    ctx.shadowBlur = 4;
+                    
+                    let textY = yBottom - 18; 
+                    if (yBottom > playheadY && yTop < playheadY) textY = playheadY - 18; 
+                    if (textY < yTop + 18) textY = yTop + 18; 
+
+                    let staggerOffset = 0;
+                    if (pitchText.includes('#')) staggerOffset = -staggerAmount; 
+                    else if (pitchText.includes('b')) staggerOffset = staggerAmount; 
+
+                    ctx.font = `bold ${mainFontSize}px sans-serif`;
+                    const w1 = ctx.measureText(pitchText).width;
+                    ctx.font = `bold ${subFontSize}px sans-serif`;
+                    const w2 = ctx.measureText(octaveText).width;
+                    
+                    const totalW = w1 + w2;
+                    const startX = x + (blockWidth - totalW) / 2;
+
+                    ctx.textAlign = 'left';
+                    ctx.font = `bold ${mainFontSize}px sans-serif`;
+                    ctx.fillText(pitchText, startX, textY + staggerOffset);
+                    
+                    ctx.font = `bold ${subFontSize}px sans-serif`;
+                    ctx.fillText(octaveText, startX + w1, textY + Math.floor(6 * noteScale) + staggerOffset); 
+                    
+                    ctx.shadowBlur = 0; 
+                }
+            });
+
+            if (flashAlpha > 0) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                flashAlpha -= 0.005;
+                if (flashAlpha < 0) flashAlpha = 0;
+            }
+        }
+    </script>
+</body>
+</html>
