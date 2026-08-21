@@ -116,12 +116,12 @@
                 </div>
 
                 <div class="flex items-center gap-1 bg-gray-800 rounded p-0.5 border border-gray-600">
-                    <button id="btn-play" class="bg-blue-600 hover:bg-blue-500 w-16 py-1 rounded font-bold transition">Play</button>
+                    <button id="btn-play" class="bg-green-600 hover:bg-green-500 w-16 py-1 rounded font-bold transition">Play</button>
                     <button id="btn-step" class="bg-purple-600 hover:bg-purple-500 w-16 py-1 rounded font-bold transition" title="Skip to next chord">Step</button>
                 </div>
 
-                <!-- Mic Trigger -->
-                <div class="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded border border-gray-600">
+                <!-- Mic Trigger (Purple outlined) -->
+                <div class="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded border border-purple-500 shadow-sm shadow-purple-900/40">
                     <label class="flex items-center gap-1 cursor-pointer text-gray-300 font-bold text-[11px]" title="Mic steps through notes when paused/waiting">
                         <input type="checkbox" id="chk-mic" class="w-3.5 h-3.5 accent-purple-500"> Mic
                     </label>
@@ -135,7 +135,7 @@
                     <input type="range" id="slider-speed" min="0.1" max="2" step="0.05" value="1" class="w-20 sm:w-28 single-slider">
                     <div class="flex items-center gap-1 font-mono text-xs whitespace-nowrap">
                         <span id="lbl-speed" class="text-gray-300 w-10 text-right">1.00x</span>
-                        <span id="lbl-bpm" class="text-gray-500 w-12 text-left">120 BPM</span>
+                        <span id="lbl-bpm" class="text-green-400 font-bold w-12 text-left">120 BPM</span>
                     </div>
                 </div>
 
@@ -292,7 +292,7 @@
         }
 
         // --- Mode State ---
-        let currentMode = 'CONT'; // 'CONT' or 'WAIT'
+        let currentMode = 'CONT'; 
 
         // --- Hardware Web MIDI Integration ---
         let hardwareKeysPressed = new Map(); 
@@ -334,6 +334,7 @@
             if (connectedNames.length > 0) {
                 btnConnect.classList.add('hidden');
                 statusText.textContent = connectedNames.join(" / ");
+                statusText.title = connectedNames.join(" / ");
                 statusText.classList.remove('hidden');
                 
                 if (showPopup) {
@@ -579,7 +580,6 @@
 
         function checkMicTrigger(timestamp) {
             if (!micAnalyser || !chkMic.checked) return;
-            // Only allow mic trigger if paused, or actively waiting in WAIT mode
             if (isPlaying && currentMode === 'CONT') return;
             if (timestamp - lastMicTriggerTime < MIC_COOLDOWN) return;
 
@@ -605,8 +605,8 @@
                 isPlaying = false;
                 loopPauseUntil = 0;
                 btnPlay.textContent = 'Play';
-                btnPlay.classList.replace('bg-red-600', 'bg-blue-600');
-                btnPlay.classList.replace('hover:bg-red-500', 'hover:bg-blue-500');
+                btnPlay.classList.replace('bg-red-600', 'bg-green-600');
+                btnPlay.classList.replace('hover:bg-red-500', 'hover:bg-green-500');
                 currentTime = 0;
                 fulfilledWaitNotes.clear();
                 
@@ -696,8 +696,8 @@
             btnPlay.textContent = isPlaying ? 'Pause' : 'Play';
             btnPlay.classList.toggle('bg-red-600', isPlaying);
             btnPlay.classList.toggle('hover:bg-red-500', isPlaying);
-            btnPlay.classList.toggle('bg-blue-600', !isPlaying);
-            btnPlay.classList.toggle('hover:bg-blue-500', !isPlaying);
+            btnPlay.classList.toggle('bg-green-600', !isPlaying);
+            btnPlay.classList.toggle('hover:bg-green-500', !isPlaying);
 
             if (isPlaying) {
                 fulfilledWaitNotes.clear();
@@ -712,7 +712,7 @@
             initAudio();
             
             if (currentMode === 'CONT' && isPlaying) {
-                btnPlay.click(); // Auto-pause if in continuous mode
+                btnPlay.click(); // Auto-pause
             }
             
             stopAllAudio();
@@ -722,7 +722,6 @@
             const loopEndTime = parseInt(sliderEnd.value) * measureDuration;
 
             let nextTime = -1;
-            // Find the time of the *next* chord, looking slightly ahead to clear the current one
             for (let i = 0; i < allNotesSorted.length; i++) {
                 if (allNotesSorted[i].time > currentTime + 0.05) { 
                     nextTime = allNotesSorted[i].time;
