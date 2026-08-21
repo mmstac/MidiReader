@@ -1,8 +1,8 @@
 # MIDI Piano Visualizer (v2)
 
-A lightweight, browser-based app designed to visualize, learn, and practice piano pieces using standard MIDI (`.mid` or `.midi`) files. 
+A lightweight, browser-based app designed to visualize, learn, and practice piano pieces using standard MIDI (`.mid` or `.midi`) files. The notes display size and color can be easily configured for easy viewing, and the app allows stepping through the music either using the step button, microphone (key sound or voice), or waiting for the correct keys to be played on the midi keyboard.
 
-This app operates entirely in your web browser. It leverages HTML5 Canvas, the Web Audio API, and the Web MIDI API to locally parse, synthesize, and visually render tracks—no external software, backend servers, drivers, or heavy sample libraries required.
+This app operates entirely in your web browser, no external software, backend servers, drivers, or heavy libraries required.
 
 ## 🌟 What's New in v2
 
@@ -10,15 +10,15 @@ This app operates entirely in your web browser. It leverages HTML5 Canvas, the W
 *   **Real-time Visual Feedback:** Accurately maps your physical key strokes to the virtual on-screen piano. 
     *   🟢 **Green Circle:** Perfect hit! You played the correct note at the correct time.
     *   🔴 **Red Circle:** Incorrect pitch or mistimed keystroke.
-*   **WAIT / CONT Modes:** Train at your own pace. Switch the app to **WAIT** mode, and the timeline will gracefully pause at every upcoming chord until you press the exact corresponding keys on your physical hardware. 
-*   **Smart Step Logic:** Advance through a song chord-by-chord with the press of a button. Alternatively, check the **Mic** box to step forward automatically using a spoken word, a hand clap, or by physically playing the piano note.
+*   **WAIT / CONT Modes:** Train at your own pace. Switch the app to **WAIT** mode, and the timeline will gracefully pause at every upcoming note/chord until you press the exact corresponding keys on your physical hardware. 
+*   **Smart Step Logic:** Advance through a song note-by-note with the press of a button. Alternatively, check the **Mic** box to step forward automatically using a spoken word, a hand clap, or by physically playing the piano note.
 
 ## ✨ Core Features
 
-*   **Realistic 88-Key UI:** Notes accurately fall toward a proportionately rendered 88-key piano bed. Black keys are sized realistically to prevent optical illusions and overlaps.
-*   **Intelligent Bounding-Box Camera:** The dynamic zoom camera looks ahead to upcoming chords and smoothly pushes the frame left or right just enough to keep all active notes perfectly in view. 
+*   **88-Key UI:** Notes accurately fall toward a proportionately rendered 88-key piano bed.
+*   **Intelligent Bounding-Box Camera:** The dynamic zoom camera looks ahead to upcoming chords and smoothly pushes the frame left or right just enough to keep all active notes perfectly in view. You can alternatively set a static zoom size.
 *   **A/B Loop Training:** Isolate difficult measures by adjusting the dual-thumb loop slider. 
-*   **Deep Customization:** Open the settings menu to adjust block sizes, font colors, and customize the color family for specific notes. Settings are automatically saved to your browser.
+*   **Customize Display:** Open the settings menu to adjust note block font sizes and colors for specific notes. Settings are automatically saved to your browser.
 
 ## 🚀 Installation & Usage
 
@@ -44,3 +44,4 @@ Host the file securely via GitHub Pages to bypass local browser security blocks 
 *   Standard **HTML5**, **JavaScript**, **Web Audio API**, and **Web MIDI API**
 *   [Tailwind CSS](https://tailwindcss.com/) for UI styling
 *   [@tonejs/midi](https://github.com/Tonejs/Midi) for parsing binary `.mid` files
+*   Coding/debugging with help of Gemini and ChatGPT.
