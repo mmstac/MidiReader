@@ -22,44 +22,60 @@ This app operates entirely in your web browser, no external software, backend se
 
 ## 🚀 Instructions
 
-1. OPEN MIDI FILE and SELECT TRACKS
+### 1. Open MIDI File and Select Tracks
 You will need to have a midi file already downloaded to your device. Click on the OPEN MIDI FILE button and select it from the folder where it was saved. You will then see a list of available tracks, this will be different for each file. You can choose which tracks you want displayed. For midi files specifically for piano, often the left and right hand tracks will be separate so it is possible to practice only one hand.
-<img width="1071" height="911" alt="image" src="https://github.com/user-attachments/assets/b6376f24-cbe5-47df-ac4b-db5aef1bd6c9" />
 
-2. MAIN INTERFACE
-<img width="2555" height="1239" alt="image" src="https://github.com/user-attachments/assets/c20972c2-5659-445c-af3e-6593a6ce70bc" />
+<img width="300" alt="Track Selection Menu" src="https://github.com/user-attachments/assets/b6376f24-cbe5-47df-ac4b-db5aef1bd6c9" />
 
-MODE: CONT = continuous playback, WAIT = wait for correct keys to be pressed on the USB midi keyboard before continuing
-PLAY / PAUSE = start or pause the playback
-STEP = go to the next note, play it and pause/wait.
-MIC = this can be used to sound/voice trigger the STEP button when selected, and the slider sets the mic sensitivity
-SPEED = adjust the playback speed, BPM also shown here
-<img width="99" height="75" alt="image" src="https://github.com/user-attachments/assets/2f0edc04-75a2-4b05-b7cc-f1f240a4ebb5" />
-FULLSCREEN = toggle fullscreen mode
-<img width="87" height="74" alt="image" src="https://github.com/user-attachments/assets/957619e0-99f6-4592-9d50-45456707942d" />
-SETTINGS = customize note display
-<img width="658" height="657" alt="image" src="https://github.com/user-attachments/assets/26ba7e7a-40a3-4ffb-acdd-0607eac1dfe6" />
+### 2. Connect to USB MIDI Keyboard (OPTIONAL)
+Plug in your USB MIDI keyboard to your device and click on the CONNECT MIDI KEYBOARD button in the upper right corner. You should see a popup window confirming the device was found, and the device name will replace the connect button in the upper right corner.
 
-LOOP = Set the A/B loop measures
-TIME = time progression slider
-ZOOM = controls the viewing window, a static zoom can be selected, left displays the full keyboard, and right is dynamic auto zoom
-VOLUME = playback volume of the notes on the device
+<img width="300" alt="Connect USB Midi" src="https://github.com/user-attachments/assets/924dec04-cd2a-417d-863b-9bd7085c8f41" />
+
+
+### 3. Main Interface
+
+<img width="800" alt="Main Visualizer Interface" src="https://github.com/user-attachments/assets/c20972c2-5659-445c-af3e-6593a6ce70bc" />
+
+*   **MODE:** CONT = continuous playback, WAIT = wait for correct keys to be pressed on the USB midi keyboard.
+*   **PLAY / PAUSE:** start or pause the playback.
+*   **STEP:** go to the next note, play it and pause/wait.
+*   **MIC:** this can be used to sound/voice trigger the STEP button when selected, and the slider sets the mic sensitivity.
+*   **SPEED:** adjust the playback speed, BPM also shown here.
+*   **<img width="24" style="vertical-align: middle;" alt="Fullscreen Icon" src="https://github.com/user-attachments/assets/2f0edc04-75a2-4b05-b7cc-f1f240a4ebb5" /> FULLSCREEN:** toggle fullscreen mode.
+*   **<img width="24" style="vertical-align: middle;" alt="Settings Icon" src="https://github.com/user-attachments/assets/957619e0-99f6-4592-9d50-45456707942d" /> SETTINGS:** customize note display.
+
+<img width="400" alt="Settings Configuration Modal" src="https://github.com/user-attachments/assets/26ba7e7a-40a3-4ffb-acdd-0607eac1dfe6" />
+
+*   **LOOP:** Set the A/B loop for which measures to repeat.
+*   **TIME:** time progression slider.
+*   **ZOOM:** controls the viewing window, a static zoom can be selected.
+     Slider to the left displays the full keyboard. Slider to the right is dynamic auto zoom.
+*   **VOLUME:** playback volume of the notes on the device.
+*   **<img width="24" style="vertical-align: middle;" alt="Triangle" src="https://github.com/user-attachments/assets/631d9bab-a915-4768-ada7-8166a7095587" /> HIDE/SHOW:** Hide or show the interface
+
 
 ## 🚀 Installation & Usage
 
 Because the app is fully self-contained within a single HTML file, setup takes less than a minute.
 
-### Option 1: Live Web Link (Recommended)
+### Option 1: Live Demo (No Install Required)
+You can try the app instantly directly from the web! 
+1. Navigate to: `https://[your-username].github.io/midi-piano-visualizer/` 
+*(Make sure to update the URL with your actual GitHub username!)*
+
+### Option 2: Local File
+1. Download the `index.html` file to your computer.
+2. Double click the file to open it. 
+*(Note: If your operating system blocks the file with a security warning, right-click the file, select **Properties**, check the **Unblock** box, and open it in a modern browser like Chrome or Edge).*
+
+### Option 3: Host Your Own Live Link
 Host the file securely via GitHub Pages to bypass local browser security blocks and enable seamless hardware access.
 1. Fork or clone this repository to your own GitHub account.
 2. Go to your repository's **Settings** > **Pages**.
 3. Under "Build and deployment", select the `main` branch and click Save.
 4. After a minute, your app will be live at: `https://[your-username].github.io/midi-piano-visualizer/`
 
-### Option 2: Local File
-1. Download the `index.html` file to your computer.
-2. Double click the file to open it. 
-*(Note: If your operating system blocks the file with a security warning, right-click the file, select **Properties**, check the **Unblock** box, and open it in a modern browser like Chrome or Edge).*
 
 > ⚠️ **A Note on Web MIDI Compatibility:**
 > *   **Windows / macOS:** The Web MIDI API is natively supported on Chromium-based browsers (Chrome, Edge, Opera) and Firefox. Note that on Windows, Chrome may take an "exclusive lock" on your MIDI port, meaning you cannot run this visualizer simultaneously with a DAW (like Ableton). Mac's CoreMIDI allows multi-client routing natively.
