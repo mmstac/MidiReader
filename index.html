@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta id="viewport-meta" name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MIDI Piano Visualizer v2</title>
+    
+    <!-- Auto-Scale Script for Mobile Devices -->
+    <script>
+        if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            // Forces mobile browsers to render the page as if it were a PC monitor, 
+            // completely eliminating the need to manually pinch-to-zoom out.
+            document.getElementById('viewport-meta').setAttribute('content', 'width=1024');
+        }
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
     <style>
@@ -32,7 +42,18 @@
             padding: 10px 16px; border-top: 1px solid #374151;
             display: none; flex-direction: column; gap: 12px;
             z-index: 10;
+            transition: transform 0.3s ease-in-out;
         }
+
+        #btn-toggle-ui {
+            position: absolute; top: -28px; right: 16px; height: 28px;
+            background: rgba(31, 41, 55, 0.95);
+            border: 1px solid #374151; border-bottom: none;
+            border-radius: 8px 8px 0 0; padding: 0 16px;
+            color: #9CA3AF; font-size: 14px; font-weight: bold;
+            cursor: pointer; z-index: 20; transition: color 0.2s;
+        }
+        #btn-toggle-ui:hover { color: #FFFFFF; }
         
         #upload-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -78,7 +99,6 @@
 </head>
 <body>
 
-    <!-- Startup / Upload Screen -->
     <div id="upload-screen">
         <h1 class="text-4xl font-bold mb-4 text-blue-400">Piano MIDI Reader v2</h1>
         <p class="text-gray-400 mb-6">Select a .mid or .midi file to begin</p>
@@ -101,6 +121,10 @@
 
     <!-- Controls UI -->
     <div id="ui-bar" class="text-xs sm:text-sm">
+        
+        <!-- Collapse UI Button Tab -->
+        <button id="btn-toggle-ui" title="Hide Controls">▼</button>
+
         <!-- Row 1: Action Controls -->
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 max-w-7xl mx-auto w-full">
             <div class="flex items-center gap-2">
@@ -120,9 +144,9 @@
                     <button id="btn-step" class="bg-purple-600 hover:bg-purple-500 w-16 py-1 rounded font-bold transition" title="Skip to next chord">Step</button>
                 </div>
 
-                <!-- Mic Trigger (Purple outlined) -->
+                <!-- Mic Trigger -->
                 <div class="flex items-center gap-1.5 bg-gray-800 px-2 py-1 rounded border border-purple-500 shadow-sm shadow-purple-900/40">
-                    <label class="flex items-center gap-1 cursor-pointer text-gray-300 font-bold text-[11px]" title="Mic steps through notes when paused/waiting">
+                    <label class="flex items-center gap-1 cursor-pointer text-purple-400 font-bold text-[11px]" title="Mic steps through notes when paused/waiting">
                         <input type="checkbox" id="chk-mic" class="w-3.5 h-3.5 accent-purple-500"> Mic
                     </label>
                     <input type="range" id="slider-mic-sens" min="0.01" max="0.5" step="0.01" value="0.1" class="w-12 single-slider" title="Mic Sensitivity">
@@ -293,6 +317,25 @@
 
         // --- Mode State ---
         let currentMode = 'CONT'; 
+        let uiVisible = true;
+
+        // UI Collapse Toggle
+        const uiBar = document.getElementById('ui-bar');
+        const btnToggleUi = document.getElementById('btn-toggle-ui');
+
+        btnToggleUi.addEventListener('click', () => {
+            uiVisible = !uiVisible;
+            if (uiVisible) {
+                uiBar.style.transform = 'translateY(0)';
+                btnToggleUi.textContent = '▼';
+                btnToggleUi.title = 'Hide Controls';
+            } else {
+                uiBar.style.transform = 'translateY(100%)';
+                btnToggleUi.textContent = '▲';
+                btnToggleUi.title = 'Show Controls';
+            }
+            setTimeout(resize, 300); // Recalculate canvas drawHeight after css transition
+        });
 
         // --- Hardware Web MIDI Integration ---
         let hardwareKeysPressed = new Map(); 
@@ -440,6 +483,7 @@
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            if (!isPlaying) drawVisualizer();
         }
         window.addEventListener('resize', resize);
         
@@ -508,7 +552,6 @@
         resize();
 
         const uiUpload = document.getElementById('upload-screen');
-        const uiBar = document.getElementById('ui-bar');
         const btnPlay = document.getElementById('btn-play');
         const btnStep = document.getElementById('btn-step');
         const btnModeCont = document.getElementById('btn-mode-cont');
@@ -580,6 +623,7 @@
 
         function checkMicTrigger(timestamp) {
             if (!micAnalyser || !chkMic.checked) return;
+            // Only allow mic trigger if paused, or actively waiting in WAIT mode
             if (isPlaying && currentMode === 'CONT') return;
             if (timestamp - lastMicTriggerTime < MIC_COOLDOWN) return;
 
@@ -712,7 +756,7 @@
             initAudio();
             
             if (currentMode === 'CONT' && isPlaying) {
-                btnPlay.click(); // Auto-pause
+                btnPlay.click(); // Auto-pause if in continuous mode
             }
             
             stopAllAudio();
@@ -722,6 +766,7 @@
             const loopEndTime = parseInt(sliderEnd.value) * measureDuration;
 
             let nextTime = -1;
+            // Find the time of the *next* chord, looking slightly ahead to clear the current one
             for (let i = 0; i < allNotesSorted.length; i++) {
                 if (allNotesSorted[i].time > currentTime + 0.05) { 
                     nextTime = allNotesSorted[i].time;
@@ -921,7 +966,7 @@
             ctx.fillStyle = '#111827';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const uiHeight = uiBar.style.display === 'flex' ? uiBar.offsetHeight : 0;
+            const uiHeight = (uiBar.style.display === 'flex' && uiVisible) ? uiBar.offsetHeight : 0;
             const drawHeight = canvas.height - uiHeight;
             const playheadY = drawHeight * 0.70; 
             const pixelsPerSecond = 350; 
