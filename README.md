@@ -20,6 +20,31 @@ This app operates entirely in your web browser, no external software, backend se
 *   **A/B Loop Training:** Isolate difficult measures by adjusting the dual-thumb loop slider. 
 *   **Customize Display:** Open the settings menu to adjust note block font sizes and colors for specific notes. Settings are automatically saved to your browser.
 
+## 🚀 Instructions
+
+1. OPEN MIDI FILE and SELECT TRACKS
+You will need to have a midi file already downloaded to your device. Click on the OPEN MIDI FILE button and select it from the folder where it was saved. You will then see a list of available tracks, this will be different for each file. You can choose which tracks you want displayed. For midi files specifically for piano, often the left and right hand tracks will be separate so it is possible to practice only one hand.
+<img width="1071" height="911" alt="image" src="https://github.com/user-attachments/assets/b6376f24-cbe5-47df-ac4b-db5aef1bd6c9" />
+
+2. MAIN INTERFACE
+<img width="2555" height="1239" alt="image" src="https://github.com/user-attachments/assets/c20972c2-5659-445c-af3e-6593a6ce70bc" />
+
+MODE: CONT = continuous playback, WAIT = wait for correct keys to be pressed on the USB midi keyboard before continuing
+PLAY / PAUSE = start or pause the playback
+STEP = go to the next note, play it and pause/wait.
+MIC = this can be used to sound/voice trigger the STEP button when selected, and the slider sets the mic sensitivity
+SPEED = adjust the playback speed, BPM also shown here
+<img width="99" height="75" alt="image" src="https://github.com/user-attachments/assets/2f0edc04-75a2-4b05-b7cc-f1f240a4ebb5" />
+FULLSCREEN = toggle fullscreen mode
+<img width="87" height="74" alt="image" src="https://github.com/user-attachments/assets/957619e0-99f6-4592-9d50-45456707942d" />
+SETTINGS = customize note display
+<img width="658" height="657" alt="image" src="https://github.com/user-attachments/assets/26ba7e7a-40a3-4ffb-acdd-0607eac1dfe6" />
+
+LOOP = Set the A/B loop measures
+TIME = time progression slider
+ZOOM = controls the viewing window, a static zoom can be selected, left displays the full keyboard, and right is dynamic auto zoom
+VOLUME = playback volume of the notes on the device
+
 ## 🚀 Installation & Usage
 
 Because the app is fully self-contained within a single HTML file, setup takes less than a minute.
