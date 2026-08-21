@@ -4,16 +4,6 @@
     <meta charset="UTF-8">
     <meta id="viewport-meta" name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MIDI Piano Visualizer v2</title>
-    
-    <!-- Auto-Scale Script for Mobile Devices -->
-    <script>
-        if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            // Forces mobile browsers to render the page as if it were a PC monitor, 
-            // completely eliminating the need to manually pinch-to-zoom out.
-            document.getElementById('viewport-meta').setAttribute('content', 'width=1024');
-        }
-    </script>
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js"></script>
     <style>
@@ -100,8 +90,8 @@
 <body>
 
     <div id="upload-screen">
-        <h1 class="text-4xl font-bold mb-4 text-blue-400">Piano MIDI Reader v2</h1>
-        <p class="text-gray-400 mb-6">Select a .mid or .midi file to begin</p>
+        <h1 class="text-4xl font-bold mb-4 text-blue-400 text-center">Piano MIDI Reader v2</h1>
+        <p class="text-gray-400 mb-6 text-center">Select a .mid or .midi file to begin</p>
         <label class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded cursor-pointer transition">
             Load MIDI File
             <input type="file" id="file-input-initial" accept=".mid,.midi" class="hidden">
@@ -226,18 +216,18 @@
     </div>
 
     <!-- MIDI Connection Confirmation Pop-up -->
-    <div id="modal-midi-confirm" class="hidden absolute inset-0 bg-black bg-opacity-80 z-[70] flex items-center justify-center">
-        <div class="bg-gray-800 p-8 rounded-lg w-[400px] border border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.3)] flex flex-col text-center">
+    <div id="modal-midi-confirm" class="hidden absolute inset-0 bg-black bg-opacity-80 z-[70] flex items-center justify-center px-4">
+        <div class="bg-gray-800 p-8 rounded-lg w-full max-w-[400px] border border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.3)] flex flex-col text-center">
             <h2 class="text-2xl font-bold mb-2 text-green-400">MIDI Connected!</h2>
             <p class="text-sm text-gray-300 mb-4">Successfully bridged with the following hardware:</p>
-            <p id="midi-device-names" class="text-lg font-bold text-white mb-8 bg-gray-900 p-4 rounded border border-gray-700"></p>
+            <p id="midi-device-names" class="text-lg font-bold text-white mb-8 bg-gray-900 p-4 rounded border border-gray-700 break-words"></p>
             <button id="btn-midi-ok" class="w-full bg-green-600 hover:bg-green-500 py-3 rounded font-bold transition text-white text-lg shadow-lg">OK</button>
         </div>
     </div>
 
     <!-- Track Selection Modal -->
-    <div id="modal-tracks" class="hidden absolute inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center">
-        <div class="bg-gray-800 p-6 rounded-lg w-96 border border-gray-600 shadow-2xl flex flex-col max-h-[80vh]">
+    <div id="modal-tracks" class="hidden absolute inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center px-4">
+        <div class="bg-gray-800 p-6 rounded-lg w-full max-w-[400px] border border-gray-600 shadow-2xl flex flex-col max-h-[80vh]">
             <h2 class="text-xl font-bold mb-2 text-blue-400 border-b border-gray-600 pb-2">Select Tracks</h2>
             <p class="text-sm text-gray-400 mb-4">Choose which tracks to load into the visualizer.</p>
             <div id="track-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-2 mb-6 pr-2"></div>
@@ -315,11 +305,10 @@
             return (octave * 7) + offsets[note];
         }
 
-        // --- Mode State ---
+        // --- Mode State & UI Collapse ---
         let currentMode = 'CONT'; 
         let uiVisible = true;
 
-        // UI Collapse Toggle
         const uiBar = document.getElementById('ui-bar');
         const btnToggleUi = document.getElementById('btn-toggle-ui');
 
@@ -334,7 +323,38 @@
                 btnToggleUi.textContent = '▲';
                 btnToggleUi.title = 'Show Controls';
             }
-            setTimeout(resize, 300); // Recalculate canvas drawHeight after css transition
+            setTimeout(resize, 300); 
+        });
+
+        // --- Fullscreen & Viewport Scaling Logic ---
+        function handleFullscreenChange() {
+            const viewportMeta = document.getElementById('viewport-meta');
+            const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+            
+            if (isFullscreen) {
+                // If on a mobile device, force a wide viewport scale to perfectly fit the keyboard
+                if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                    viewportMeta.setAttribute('content', 'width=1024');
+                }
+            } else {
+                // Exited fullscreen, restore standard mobile responsive behavior
+                viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0');
+            }
+            setTimeout(resize, 200);
+        }
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                const docEl = document.documentElement;
+                const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen;
+                if (requestFS) requestFS.call(docEl).catch(err => console.warn(err.message));
+            } else {
+                const exitFS = document.exitFullscreen || document.webkitExitFullscreen;
+                if (exitFS) exitFS.call(document);
+            }
         });
 
         // --- Hardware Web MIDI Integration ---
@@ -460,14 +480,12 @@
         let loopPauseUntil = 0; 
         let flashAlpha = 0; 
 
-        // Microphone Setup
         let micStream = null;
         let micAnalyser = null;
         let micDataArray = null;
         let lastMicTriggerTime = 0;
         const MIC_COOLDOWN = 350;
 
-        // Visual Coordinates
         let visualMin = 12; 
         let visualMax = 63; 
 
@@ -483,7 +501,6 @@
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            if (!isPlaying) drawVisualizer();
         }
         window.addEventListener('resize', resize);
         
@@ -540,14 +557,6 @@
 
         document.getElementById('btn-settings').addEventListener('click', () => { document.getElementById('modal-settings').classList.remove('hidden'); });
         document.getElementById('btn-close-settings').addEventListener('click', () => { document.getElementById('modal-settings').classList.add('hidden'); });
-
-        document.getElementById('btn-fullscreen').addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => console.warn(err.message));
-            } else {
-                document.exitFullscreen();
-            }
-        });
 
         resize();
 
@@ -623,7 +632,6 @@
 
         function checkMicTrigger(timestamp) {
             if (!micAnalyser || !chkMic.checked) return;
-            // Only allow mic trigger if paused, or actively waiting in WAIT mode
             if (isPlaying && currentMode === 'CONT') return;
             if (timestamp - lastMicTriggerTime < MIC_COOLDOWN) return;
 
@@ -756,7 +764,7 @@
             initAudio();
             
             if (currentMode === 'CONT' && isPlaying) {
-                btnPlay.click(); // Auto-pause if in continuous mode
+                btnPlay.click(); // Auto-pause
             }
             
             stopAllAudio();
@@ -766,7 +774,6 @@
             const loopEndTime = parseInt(sliderEnd.value) * measureDuration;
 
             let nextTime = -1;
-            // Find the time of the *next* chord, looking slightly ahead to clear the current one
             for (let i = 0; i < allNotesSorted.length; i++) {
                 if (allNotesSorted[i].time > currentTime + 0.05) { 
                     nextTime = allNotesSorted[i].time;
@@ -1175,8 +1182,10 @@
                 const keyW = isBlack ? baseWhiteWidth * 0.65 : baseWhiteWidth;
                 const radius = Math.min(keyW / 3, 10);
                 
+                // Move the circle slightly higher up the physical key 
+                // so it never gets clipped by mobile browser chrome.
                 const keyH = isBlack ? kbHeight * 0.65 : kbHeight;
-                const yCenter = kbTop + keyH - (radius * 2.5);
+                const yCenter = kbTop + keyH - (radius * 4.0);
 
                 const isHit = isExpectedHit(pitch);
 
