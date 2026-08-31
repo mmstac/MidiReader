@@ -61,8 +61,7 @@ Because the app is fully self-contained within a single HTML file, setup takes l
 
 ### Option 1: Live Demo (No Install Required)
 You can try the app instantly directly from the web! 
-1. Navigate to: `https://[your-username].github.io/midi-piano-visualizer/` 
-*(Make sure to update the URL with your actual GitHub username!)*
+1. Navigate to: `https://mmstac.github.io/midi-piano-visualizer/` 
 
 ### Option 2: Local File
 1. Download the `index.html` file to your computer.
