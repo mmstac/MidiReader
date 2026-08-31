@@ -61,7 +61,7 @@ Because the app is fully self-contained within a single HTML file, setup takes l
 
 ### Option 1: Live Demo (No Install Required)
 You can try the app instantly directly from the web! 
-1. Navigate to: `https://mmstac.github.io/midi-piano-visualizer/` 
+1. Navigate to: `https://mmstac.github.io/MidiReader/` 
 
 ### Option 2: Local File
 1. Download the `index.html` file to your computer.
@@ -73,7 +73,7 @@ Host the file securely via GitHub Pages to bypass local browser security blocks 
 1. Fork or clone this repository to your own GitHub account.
 2. Go to your repository's **Settings** > **Pages**.
 3. Under "Build and deployment", select the `main` branch and click Save.
-4. After a minute, your app will be live at: `https://[your-username].github.io/midi-piano-visualizer/`
+4. After a minute, your app will be live at: `https://[your-username].github.io/MidiReader/`
 
 
 > ⚠️ **A Note on Web MIDI Compatibility:**
